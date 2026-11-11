@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>몬스터 서바이버</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
+<style>
+  :root { --panel: rgba(16, 20, 30, 0.78); --line: rgba(255, 255, 255, 0.14); --text: #f2f4f8; --dim: #a9b2c3; --accent: #ffd257; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1018; color: var(--text); font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; user-select: none; }
+  canvas#view { display: block; width: 100vw; height: 100vh; }
+  .hidden { display: none !important; }
+  .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: rgba(8, 10, 16, 0.72); z-index: 10; }
+  .overlay h1 { margin: 0; font-size: 44px; letter-spacing: 2px; text-shadow: 0 3px 0 #000; }
+  .overlay p { margin: 0; color: var(--dim); }
+  .cards { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; padding: 0 16px; }
+  .card { width: 210px; padding: 16px; border-radius: 12px; background: var(--panel); border: 2px solid var(--line); cursor: pointer; text-align: center; transition: transform .08s, border-color .08s; }
+  .card:hover { transform: translateY(-4px); border-color: var(--accent); }
+  .card.picked { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent); }
+  #lobby { margin: 14px 0 4px; font-size: 14px; color: var(--dim); text-align: center; line-height: 2; }
+  #lobby b { color: var(--text); user-select: text; }
+  .lp { display: inline-block; padding: 1px 12px; margin: 0 4px; border-radius: 99px; border: 2px solid var(--line); color: var(--text); }
+  .lp.ready { border-color: var(--accent); }
+  .card canvas { width: 128px; height: 128px; image-rendering: pixelated; }
+  .card .name { font-size: 20px; font-weight: bold; margin: 6px 0 2px; }
+  .card .tag { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 13px; font-weight: bold; color: #111; margin: 4px 0 8px; }
+  .card .desc { font-size: 14px; color: var(--dim); line-height: 1.45; }
+  .card .key { font-size: 12px; color: var(--dim); margin-top: 8px; }
+  button.big { font: inherit; font-size: 18px; font-weight: bold; padding: 12px 28px; border-radius: 10px; border: 0; background: var(--accent); color: #222; cursor: pointer; }
+  #loadbar { width: 320px; height: 10px; border-radius: 99px; background: #222a38; overflow: hidden; }
+  #loadbar div { height: 100%; width: 0; background: var(--accent); }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  #xpbar { position: absolute; top: 0; left: 0; right: 0; height: 12px; background: rgba(0,0,0,.55); }
+  #xpbar div { height: 100%; width: 0; background: linear-gradient(90deg, #4fa3ff, #7ee0ff); }
+  #lvl { position: absolute; top: 16px; left: 16px; font-size: 22px; font-weight: bold; text-shadow: 0 2px 0 #000; }
+  #time { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); font-size: 26px; font-weight: bold; text-shadow: 0 2px 0 #000; }
+  #kills { position: absolute; top: 50px; left: 50%; transform: translateX(-50%); color: var(--dim); text-shadow: 0 1px 0 #000; }
+  #hpwrap { position: absolute; left: 16px; bottom: 18px; width: 300px; }
+  #hpbar { height: 18px; border-radius: 6px; background: rgba(0,0,0,.6); overflow: hidden; border: 1px solid var(--line); }
+  #hpbar div { height: 100%; width: 100%; background: #4fd36b; }
+  #hptext { font-size: 13px; margin-top: 3px; text-shadow: 0 1px 0 #000; }
+  #skills { position: absolute; left: 16px; top: 50px; display: flex; flex-direction: column; gap: 4px; }
+  .sk { font-size: 13px; padding: 3px 9px; border-radius: 6px; background: var(--panel); border-left: 4px solid; }
+  #minimap { position: absolute; top: 20px; right: 16px; width: 180px; height: 180px; border-radius: 10px; border: 2px solid var(--line); }
+  #region { position: absolute; top: 206px; right: 16px; width: 180px; text-align: center; font-size: 14px; text-shadow: 0 1px 0 #000; }
+  #toast { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); font-size: 26px; font-weight: bold; text-shadow: 0 3px 0 #000; opacity: 0; transition: opacity .3s; text-align: center; white-space: pre-line; }
+  #actbar { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+  .act { position: relative; width: 120px; padding: 7px 10px 9px; border-radius: 10px; background: var(--panel); border: 2px solid var(--line); overflow: hidden; text-align: center; }
+  .act.ready { border-color: var(--accent); }
+  .act .k { font-size: 11px; color: var(--accent); font-weight: bold; }
+  .act .n { font-size: 15px; font-weight: bold; }
+  .act .s { font-size: 12px; color: var(--dim); }
+  .act .f { position: absolute; left: 0; bottom: 0; height: 4px; background: var(--accent); }
+  #bosses { position: absolute; top: 76px; left: 50%; transform: translateX(-50%); width: 460px; text-align: center; }
+  .bname { font-size: 15px; font-weight: bold; text-shadow: 0 2px 0 #000; margin-top: 4px; }
+  .bname.warn { color: #ff6b5a; font-size: 18px; }
+  .bnote { font-size: 13px; color: var(--accent); font-weight: normal; }
+  .bbar { height: 12px; border-radius: 6px; background: rgba(0,0,0,.6); border: 1px solid var(--line); overflow: hidden; }
+  .bbar div { height: 100%; background: linear-gradient(90deg, #ff4a3a, #ff9a4a); }
+  #party { position: absolute; left: 16px; bottom: 74px; display: flex; flex-direction: column; gap: 4px; width: 300px; pointer-events: auto; }
+  .pdown { flex: 1; color: #ff8a7a; }
+  .rel { font: inherit; font-size: 12px; border: 0; border-radius: 5px; padding: 1px 7px; background: rgba(255,255,255,.12); color: var(--dim); cursor: pointer; }
+  .rel:hover { background: rgba(255,90,70,.5); color: #fff; }
+  .rel.armed { background: #e0483a; color: #fff; font-weight: bold; }
+  .pm { font-size: 13px; padding: 4px 9px; border-radius: 6px; background: var(--panel); border-left: 4px solid; display: flex; align-items: center; gap: 8px; }
+  .pbar { flex: 1; height: 7px; border-radius: 4px; background: rgba(0,0,0,.6); overflow: hidden; display: inline-block; }
+  .pbar span { display: block; height: 100%; background: #4fd36b; }
+  .pmode { font-size: 12px; color: var(--dim); text-shadow: 0 1px 0 #000; }
+  #hint { position: absolute; top: 232px; right: 16px; width: 180px; font-size: 12px; line-height: 1.5; color: var(--dim); text-align: right; text-shadow: 0 1px 0 #000; }
+  #hurt { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 120px rgba(255, 30, 30, .8); opacity: 0; z-index: 4; }
+  .lvcard { width: 240px; cursor: pointer; }
+  .btns { display: flex; gap: 12px; }
+  /* LAN game: level-up cards sit at the bottom and the game goes on behind them */
+  #levelup.mini { background: none; justify-content: flex-end; padding-bottom: 110px; pointer-events: none; gap: 8px; }
+  #levelup.mini h1 { display: none; } #levelup.mini p { text-shadow: 0 1px 2px #000; color: var(--text); }
+  #levelup.mini .card { pointer-events: auto; width: 165px; padding: 8px; background: rgba(16, 20, 30, 0.9); }
+  #levelup.mini .card .name { font-size: 16px; } #levelup.mini .card .desc { font-size: 12px; } #levelup.mini .card .key { display: none; }
+  #levelup.mini .card canvas { display: none; }
+  button.ghost { background: var(--panel); color: var(--text); border: 2px solid var(--line); font-size: 16px; }
+  #dexgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; width: min(1000px, 92vw); max-height: 62vh; overflow-y: auto; padding: 4px; }
+  .dexcard { background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 6px; text-align: center; }
+  .dexcard.caught { border-color: var(--accent); }
+  #dexboss { display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px; width: min(1000px, 92vw); }
+  #dexboss .dexcard.caught { border-color: #c08aff; }
+  .dexcard .dk { font-size: 11px; color: var(--dim); }
+  #select { justify-content: safe center; overflow-y: auto; padding: 16px 0; }
+  #starters .card { width: 200px; padding: 10px 12px; } #starters .card canvas { width: 88px; height: 88px; } #starters .card .desc { font-size: 13px; }
+  .card.locked { opacity: 0.55; } .card.locked:hover { transform: none; border-color: var(--line); }
+  .shopcard { width: 170px; } .shopcard .lv { color: var(--accent); font-weight: bold; } .shopcard .cost { margin-top: 8px; font-size: 18px; font-weight: bold; }
+  .card.dim { opacity: 0.5; }
+  #time small { display: block; font-size: 14px; color: #d4a8ff; text-align: center; }
+  #overstats { text-align: center; line-height: 1.8; }
+  .dexcard canvas { width: 72px; height: 72px; image-rendering: pixelated; }
+  .dn { font-size: 13px; font-weight: bold; }
+  .de { font-size: 11px; }
+  .plv { font-size: 11px; color: var(--accent); }
+  .syn { font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--panel); border-left: 4px solid; }
+  .lvcard .name { font-size: 19px; }
+  .lvcard .lv { color: var(--accent); font-weight: bold; }
+</style>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/addons/" } }</script>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="hurt"></div>
+
+<div id="hud" class="hidden">
+  <div id="xpbar"><div></div></div>
+  <div id="lvl">Lv 1</div>
+  <div id="time">00:00</div>
+  <div id="kills">처치 0</div>
+  <div id="skills"></div>
+  <canvas id="minimap" width="180" height="180"></canvas>
+  <div id="region"></div>
+  <div id="toast"></div>
+  <div id="bosses"></div>
+  <div id="party"></div>
+  <div id="hpwrap"><div id="hpbar"><div></div></div><div id="hptext"></div></div>
+  <div id="actbar"><div class="act" id="actA"></div><div class="act" id="actD"></div><div class="act" id="actU"></div></div>
+  <div id="hint">WASD 이동 · 클릭 고유기<br>Shift 대시 · Q 필살기 · E 던전<br>F/R 동료 지켜/따라와<br>우클릭 드래그 시점 · 휠 확대<br>B 가벼운 모드 · M 소리<br>N 피해 숫자 · Esc 정지</div>
+</div>
+
+<div id="loading" class="overlay"><h1>몬스터 서바이버</h1><p id="loadtext">세계를 만드는 중…</p><div id="loadbar"><div></div></div></div>
+<div id="select" class="overlay hidden"><h1>함께 모험할 몬스터를 고르세요</h1><p>공격은 자동입니다. 몬스터마다 자기 속성의 기술 6가지만 배웁니다. 경험치 구슬을 모아 강해지세요.</p><div class="cards" id="starters"></div><div id="lobby"></div><div class="btns"><button class="big ghost" id="dexbtn">📖 도감 <span id="dexcount"></span></button><button class="big ghost" id="shopbtn">💎 영구 강화 <span id="shopcount"></span></button></div></div>
+<div id="dex" class="overlay hidden"><h1>몬스터 도감</h1><p id="dexsum"></p><div id="dexboss"></div><div id="dexgrid"></div><button class="big" id="dexclose">닫기</button></div>
+<div id="levelup" class="overlay hidden"><h1>레벨 업!</h1><p>하나를 고르세요 (1 · 2 · 3)</p><div class="cards" id="choices"></div></div>
+<div id="pause" class="overlay hidden"><h1>일시 정지</h1><p>Esc 를 눌러 계속하기</p></div>
+<div id="shop" class="overlay hidden"><h1>영구 강화</h1><p id="shopinfo"></p><div class="cards" id="shopgrid"></div><button class="big ghost" id="shopclose">돌아가기 (Esc)</button></div>
+<div id="over" class="overlay hidden"><h1>쓰러졌습니다</h1><p id="overstats"></p><div class="btns"><button class="big" id="restart">바로 재시작 (Enter)</button><button class="big ghost" id="again">대기실로</button></div><p id="overwait"></p></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
