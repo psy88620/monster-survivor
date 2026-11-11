@@ -52,8 +52,9 @@ export class Game {
   }
 
   async preload() {
-    for (const key of Object.keys(MONSTERS)) {
-      const sheet = await loadSheet(key);
+    const keys = Object.keys(MONSTERS), sheets = await Promise.all(keys.map(loadSheet));   // 한꺼번에 받기(웹에서 하나씩이면 느림)
+    for (const [i, key] of keys.entries()) {
+      const sheet = sheets[i];
       const elite = Object.values(BIOMES).some(b => b.elite === key);
       this.batches[key] = new SpriteBatch(this.scene, sheet, elite ? 320 : 260);
     }
